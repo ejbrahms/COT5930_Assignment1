@@ -1,6 +1,8 @@
 #include <asf.h>
 #include <stdio.h>
 
+#define PIN_USART_TX PIN_PC27
+
 void setupLED(ioport_pin_t pin);
 void lightLED(char ledToToggle);
 void setupButton(ioport_pin_t pin);
@@ -9,6 +11,7 @@ void buttonHandler_EXT9(void);
 void buttonHandler_EXT3(void);
 void buttonHandler_EXT4(void);
 void handleInput(void);
+void sendChar(uint16_t baudRate, char c);
 
 void setupLED(ioport_pin_t pin) {
 	ioport_set_pin_dir(pin, IOPORT_DIR_OUTPUT);
@@ -108,6 +111,37 @@ void lightLED(char ledToToggle) {
 	}
 }
 
+void sendChar(uint16_t baudRate, char c) {
+	uint16_t bitRate = 1000000/baudRate;
+	
+	// Pull low, default is high -- start bit
+	ioport_set_pin_level(PIN_USART_TX, false);
+	delay_us(bitRate);
+	ioport_set_pin_level(PIN_USART_TX, true);
+	delay_us(bitRate);
+	
+	ioport_set_pin_level(PIN_USART_TX, false);
+	delay_us(bitRate);
+	ioport_set_pin_level(PIN_USART_TX, true);
+	delay_us(bitRate);
+	ioport_set_pin_level(PIN_USART_TX, false);
+	delay_us(bitRate);
+	ioport_set_pin_level(PIN_USART_TX, false);
+	delay_us(bitRate);
+	ioport_set_pin_level(PIN_USART_TX, false);
+	delay_us(bitRate);
+	ioport_set_pin_level(PIN_USART_TX, false);
+	delay_us(bitRate);
+	ioport_set_pin_level(PIN_USART_TX, false);
+	delay_us(bitRate);
+	ioport_set_pin_level(PIN_USART_TX, false);
+	delay_us(bitRate);
+	
+	// High -- stop bit
+	ioport_set_pin_level(PIN_USART_TX, true);
+	delay_ms(bitRate);
+}
+
 
 int main (void)
 {
@@ -156,5 +190,8 @@ int main (void)
 	
 	printf("Which LED should I light up - Press 0, 1, 2, or 3? \r\n");
 	printf("Or PUSH a button to get a response! \r\n");
+	sendChar(9600, 'A');
+	sendChar(9600, 'A');
+	sendChar(9600, 'A');
 	while (1) ;
 }
