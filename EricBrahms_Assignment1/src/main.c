@@ -8,6 +8,7 @@ void buttonHandler_SW0(void);
 void buttonHandler_EXT9(void);
 void buttonHandler_EXT3(void);
 void buttonHandler_EXT4(void);
+void handleInput(void);
 
 void setupLED(ioport_pin_t pin) {
 	ioport_set_pin_dir(pin, IOPORT_DIR_OUTPUT);
@@ -76,6 +77,13 @@ void buttonHandler_EXT4(void) {
 	printf("Button 3 \r\n");
 }
 
+void handleInput(void) {
+	// SET RX pin to interrupt?
+	char ledToToggle;
+	usart_serial_getchar(USART1, &ledToToggle);
+	lightLED(ledToToggle);
+}
+
 void lightLED(char ledToToggle) {
 	
 	//printf(" %c \r\n", ledToToggle);
@@ -137,12 +145,16 @@ int main (void)
 	// Button 3
 	setupButton(EXT1_PIN_4);
 	
+	// Setup the interrupt for USART.
+	// Rx pin = PC28.
+	// Tell the controller to call the button handler function with priority 1.
+	gpio_set_pin_callback(PIN_PC26, handleInput, 1);
+	
+	// Clear current interrupts before enabling.
+	gpio_clear_pin_interrupt_flag(PIN_PC26);
+	gpio_enable_pin_interrupt(PIN_PC26);
+	
 	printf("Which LED should I light up - Press 0, 1, 2, or 3? \r\n");
 	printf("Or PUSH a button to get a response! \r\n");
-	while (1) {
-		// SET RX pin to interrupt?
-		char ledToToggle;
-		usart_serial_getchar(USART1, &ledToToggle);
-		lightLED(ledToToggle);
-	}
+	while (1) ;
 }
