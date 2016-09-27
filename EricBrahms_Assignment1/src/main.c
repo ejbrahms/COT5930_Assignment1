@@ -1,8 +1,17 @@
+// Assignment 1
+// Eric Brahms
+// COT5930 Embedded Network Sensor Systems
+
 #include <asf.h>
 #include <stdio.h>
 
 #define PIN_USART_TX PIN_PC27
+// Had to lower baud rate to get bit banging working.
+// This is due to software delays.
+// ...spent 4 hours trying to figure out why it wouldn't work.
+#define BAUD_RATE 185
 
+// Prototyping...
 void setupLED(ioport_pin_t pin);
 void lightLED(char ledToToggle);
 void setupButton(ioport_pin_t pin);
@@ -11,13 +20,16 @@ void buttonHandler_EXT9(void);
 void buttonHandler_EXT3(void);
 void buttonHandler_EXT4(void);
 void handleInput(void);
-void sendChar(uint16_t baudRate, char c);
+void sendChar(uint32_t baudRate, unsigned char c, uint16_t charLength);
+void sendString(const char toWrite[]);
 
+// Function to setup LED pins.
 void setupLED(ioport_pin_t pin) {
 	ioport_set_pin_dir(pin, IOPORT_DIR_OUTPUT);
 	ioport_set_pin_level(pin, IOPORT_PIN_LEVEL_HIGH);
 }
 
+// Setup the button.
 void setupButton(ioport_pin_t pin) {
 	// Enable the button as input.
 	ioport_set_pin_dir(pin, IOPORT_DIR_INPUT);
@@ -65,19 +77,19 @@ void setupButton(ioport_pin_t pin) {
 }
 
 void buttonHandler_SW0(void) {
-	printf("Button 0 \r\n");
+	sendString("Button 0 \r\n");
 }
 
 void buttonHandler_EXT9(void) {
-	printf("Button 1 \r\n");
+	sendString("Button 1 \r\n");
 }
 
 void buttonHandler_EXT3(void) {
-	printf("Button 2 \r\n");
+	sendString("Button 2 \r\n");
 }
 
 void buttonHandler_EXT4(void) {
-	printf("Button 3 \r\n");
+	sendString("Button 3 \r\n");
 }
 
 void handleInput(void) {
@@ -111,45 +123,57 @@ void lightLED(char ledToToggle) {
 	}
 }
 
-void sendChar(uint16_t baudRate, char c) {
-	uint16_t bitRate = 1000000/baudRate;
+void sendChar(uint32_t baudRate, unsigned char c, uint16_t charLength) {
+	uint32_t bitRate = 1000000/baudRate;
+	int i;
+	
+	// Enable the pin as an output.
+	// Current state is MUX-Disabled for USART.
+	ioport_set_pin_dir(PIN_USART_TX, IOPORT_DIR_OUTPUT);
+	ioport_enable_pin(PIN_USART_TX);
 	
 	// Pull low, default is high -- start bit
-	ioport_set_pin_level(PIN_USART_TX, false);
-	delay_us(bitRate);
-	ioport_set_pin_level(PIN_USART_TX, true);
+	ioport_set_pin_level(PIN_USART_TX, IOPORT_PIN_LEVEL_LOW);
 	delay_us(bitRate);
 	
-	ioport_set_pin_level(PIN_USART_TX, false);
-	delay_us(bitRate);
-	ioport_set_pin_level(PIN_USART_TX, true);
-	delay_us(bitRate);
-	ioport_set_pin_level(PIN_USART_TX, false);
-	delay_us(bitRate);
-	ioport_set_pin_level(PIN_USART_TX, false);
-	delay_us(bitRate);
-	ioport_set_pin_level(PIN_USART_TX, false);
-	delay_us(bitRate);
-	ioport_set_pin_level(PIN_USART_TX, false);
-	delay_us(bitRate);
-	ioport_set_pin_level(PIN_USART_TX, false);
-	delay_us(bitRate);
-	ioport_set_pin_level(PIN_USART_TX, false);
-	delay_us(bitRate);
+	for(i=0; i<charLength; ++i) {
+		// Get the value of the first bit in the byte.
+		if(c & 1) {
+			ioport_set_pin_level(PIN_USART_TX, IOPORT_PIN_LEVEL_HIGH);
+		} else {
+			ioport_set_pin_level(PIN_USART_TX, IOPORT_PIN_LEVEL_LOW);
+	}
+		
+		// Shift the binary of the char to get the next bit to the first bit.
+		c >>= 1;
+		
+		delay_us(bitRate);
+	}
 	
 	// High -- stop bit
-	ioport_set_pin_level(PIN_USART_TX, true);
-	delay_ms(bitRate);
+	ioport_set_pin_level(PIN_USART_TX, IOPORT_PIN_LEVEL_HIGH);
+	delay_us(bitRate);
+	
+	// Set the pin back to MUX for USART input.
+	ioport_set_pin_mode(PIN_USART_TX, COM_PORT_TX_MUX);
+	ioport_disable_pin(PIN_USART_TX);
 }
 
+void sendString(const char toWrite[]) {
+	int i;
+	for (i = 0; toWrite[i] != 0; i++){
+		sendChar(BAUD_RATE, toWrite[i], 8);
+	}
+}
 
 int main (void)
 {
 	sysclk_init();
 	board_init();
+	ioport_init();
 	
 	usart_serial_options_t serial_config = {
-		.baudrate = 9600,
+		.baudrate = BAUD_RATE,
 		.charlength = US_MR_CHRL_8_BIT,
 		.paritytype = US_MR_PAR_NO,
 		.stopbits = US_MR_NBSTOP_1
@@ -190,8 +214,5 @@ int main (void)
 	
 	printf("Which LED should I light up - Press 0, 1, 2, or 3? \r\n");
 	printf("Or PUSH a button to get a response! \r\n");
-	sendChar(9600, 'A');
-	sendChar(9600, 'A');
-	sendChar(9600, 'A');
 	while (1) ;
 }
